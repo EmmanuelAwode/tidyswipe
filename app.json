@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Tidyswipe",
+    "slug": "tidyswipe",
+    "scheme": "tidyswipe",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.personal.tidyswipe",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Tidyswipe needs access to your photo library so you can review and clean it. Photos never leave your device.",
+          "savePhotosPermission": false,
+          "preventAutomaticLimitedAccessAlert": false
+        }
+      ],
+      ["expo-build-properties", { "ios": { "deploymentTarget": "16.4" } }],
+      "expo-image"
+    ]
+  }
+}

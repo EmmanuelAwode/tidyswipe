@@ -1,0 +1,54 @@
+name: Build unsigned IPA (for AltStore / SideStore)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Generate native iOS project
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      - name: Build release app without code signing
+        run: |
+          xcodebuild \
+            -workspace ios/Tidyswipe.xcworkspace \
+            -scheme Tidyswipe \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tee build.log | tail -n 40
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Tidyswipe.app Payload/
+          zip -qry Tidyswipe.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tidyswipe-ipa
+          path: Tidyswipe.ipa
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: build.log
