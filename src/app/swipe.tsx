@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SwipeCard, SwipeCardHandle, formatDuration } from '../components/SwipeCard';
+import { ShareButton } from '../components/ShareButton';
 import { VideoBar } from '../components/VideoBar';
 import { Button, Icon, Tap } from '../components/ui';
 import { getPending } from '../db/database';
@@ -146,6 +147,7 @@ function SwipeInner() {
                   >
                     <Icon name="arrow.up.left.and.arrow.down.right" size={15} color="#fff" />
                   </Tap>
+                  <ShareButton key={current.id} id={current.id} style={styles.glass} />
                 </View>
               </>
             )}

@@ -30,7 +30,10 @@
         {
           "photosPermission": "Tidyswipe needs access to your photo library so you can review and clean it. Photos never leave your device.",
           "savePhotosPermission": false,
-          "granularPermissions": ["photo", "video"],
+          "granularPermissions": [
+            "photo",
+            "video"
+          ],
           "preventAutomaticLimitedAccessAlert": false
         }
       ],
@@ -44,7 +47,8 @@
       ],
       "expo-image",
       "expo-video",
-      "expo-font"
+      "expo-font",
+      "expo-sharing"
     ]
   }
 }

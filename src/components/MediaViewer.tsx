@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PhotoAsset, getInfo, uriForId, videoUriOf } from '../services/photos';
+import { ShareButton } from './ShareButton';
 import { Icon, Tap } from './ui';
 
 export type ViewerAction = {
@@ -91,9 +92,12 @@ function Pager({ ids, start, onClose, actions }: {
           <Icon name="xmark" size={15} color="#000" />
           <Text style={styles.closeText}>Done</Text>
         </Tap>
-        {ids.length > 1 && (
-          <View style={styles.count}><Text style={styles.countText}>{index + 1} of {ids.length}</Text></View>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {ids.length > 1 && (
+            <View style={styles.count}><Text style={styles.countText}>{index + 1} of {ids.length}</Text></View>
+          )}
+          <ShareButton key={current} id={current} style={styles.share} size={18} />
+        </View>
       </View>
 
       {acts.length > 0 && (
@@ -148,6 +152,7 @@ const styles = StyleSheet.create({
   top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   close: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 18, borderRadius: 22, backgroundColor: '#fff' },
   closeText: { color: '#000', fontWeight: '700', fontSize: 16 },
+  share: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(60,60,60,0.9)', alignItems: 'center', justifyContent: 'center' },
   count: { height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
   countText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', justifyContent: 'center', gap: 12, paddingHorizontal: 16 },

@@ -12,7 +12,7 @@ const ANDROID: Record<string, AndroidSymbol> = {
   'film.fill': 'movie', 'square.on.square': 'content_copy', 'photo.on.rectangle.angled': 'photo_library',
   'exclamationmark.circle.fill': 'error', 'chevron.right': 'chevron_right', 'chart.bar.fill': 'bar_chart',
   'map.fill': 'map', sparkles: 'auto_awesome', 'square.grid.2x2.fill': 'grid_view', 'pause.fill': 'pause',
-  'play.fill': 'play_arrow', 'speaker.slash.fill': 'volume_off', 'speaker.wave.2.fill': 'volume_up',
+  'play.fill': 'play_arrow', 'square.and.arrow.up': 'share', 'speaker.slash.fill': 'volume_off', 'speaker.wave.2.fill': 'volume_up',
 };
 
 /** Icon: SF Symbols on iOS, the matching Material Symbol on Android. */
