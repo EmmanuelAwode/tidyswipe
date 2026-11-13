@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 
 PKG = 'com.personal.tidyswipe'
 results = []  # (ok, critical, name, detail)
+TOTAL_SEEDED = [999]  # photos + videos in the gallery before the test deletes anything
 
 
 def adb(*args, timeout=90):
@@ -143,7 +144,10 @@ def seed_media():
     # Make sure MediaStore has indexed the new files.
     sh('content call --uri content://media/ --method scan_volume --arg external_primary')
     time.sleep(6)
-    print('  images indexed:', sh('content query --uri content://media/external/images/media --projection _id').count('Row:'))
+    n_img = sh('content query --uri content://media/external/images/media --projection _id').count('Row:')
+    n_vid = sh('content query --uri content://media/external/video/media --projection _id').count('Row:')
+    TOTAL_SEEDED[0] = n_img + n_vid
+    print('  images indexed:', n_img)
     print('  videos indexed:', sh('content query --uri content://media/external/video/media --projection _id').count('Row:'))
 
 
@@ -291,8 +295,10 @@ def main():
         print('   no system dialog button found')
     time.sleep(5)
     shot('16-after-deletion')
-    left = sh('content query --uri content://media/external/images/media --projection _id').count('Row:')
-    check('Photos were really removed from the gallery', left < 9, f'{left} images still there')
+    # Which item the swipes landed on varies, so count photos and videos together.
+    left = (sh('content query --uri content://media/external/images/media --projection _id').count('Row:')
+            + sh('content query --uri content://media/external/video/media --projection _id').count('Row:'))
+    check('Items were really removed from the gallery', left < TOTAL_SEEDED[0], f'{left} items still there')
 
     # ---- Statistics / history / bookmarks ----
     time.sleep(8)
