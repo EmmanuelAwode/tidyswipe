@@ -1,3 +1,4 @@
+import * as FS from 'expo-file-system/legacy';
 import * as ML from 'expo-media-library/legacy';
 import { Platform } from 'react-native';
 import { getFileSizes } from '../../modules/photo-tools';
@@ -265,11 +266,22 @@ export function estimateSize(a: PhotoAsset): number {
   return Math.round(a.width * a.height * 0.35);
 }
 
-/** Real size via the native PhotoKit module; falls back to an estimate (e.g. in Expo Go). */
+/** Real size via the native PhotoKit module on iOS or the file itself on Android; otherwise an estimate (e.g. Expo Go on iPhone). */
 export async function sizesFor(assets: PhotoAsset[]): Promise<Record<string, number>> {
   const real = await getFileSizes(assets.map((a) => a.id));
   const out: Record<string, number> = {};
-  for (const a of assets) out[a.id] = real[a.id] ?? estimateSize(a);
+  for (const a of assets) {
+    let size = real[a.id];
+    if (size === undefined && Platform.OS === 'android') {
+      try {
+        const f = await FS.getInfoAsync(a.uri);
+        if (f.exists && f.size) size = f.size;
+      } catch {
+        // fall through to the estimate
+      }
+    }
+    out[a.id] = size ?? estimateSize(a);
+  }
   return out;
 }
 

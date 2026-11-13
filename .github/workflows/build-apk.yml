@@ -1,7 +1,7 @@
 name: Build Android APK
 
-# Builds an installable Android APK and publishes it as a GitHub Release.
-# Run it from the Actions tab, or push a tag like v1.0.0.
+# Builds an installable Android APK, tests it on an emulator, and publishes it
+# as a GitHub Release. Run it from the Actions tab, or push a tag like v1.0.0.
 on:
   workflow_dispatch:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  apk:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -30,10 +30,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npx tsc --noEmit
+
       - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build release APK
+      - name: Build release APK (phones)
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
 
@@ -44,19 +47,74 @@ jobs:
           test -f "$APK"
           cp "$APK" Tidyswipe.apk
           ls -lh Tidyswipe.apk
+          AAPT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2
+          echo "--- permissions and SDK levels"
+          "$AAPT" dump badging Tidyswipe.apk | grep -E "^(package|sdkVersion|targetSdkVersion|uses-permission|native-code)"
 
       - uses: actions/upload-artifact@v4
         with:
           name: Tidyswipe-apk
           path: Tidyswipe.apk
 
+      # Same app built for the x86_64 emulator used by the test job.
+      - name: Build test APK (emulator)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+
+      - run: cp android/app/build/outputs/apk/release/app-release.apk Tidyswipe-test.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tidyswipe-test-apk
+          path: Tidyswipe-test.apk
+          retention-days: 3
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Tidyswipe-test-apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the app on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: false
+          script: python3 .github/scripts/smoke.py Tidyswipe-test.apk
+
+  release:
+    needs: [build, test]
+    # Publish whenever the build worked; the notes say whether the emulator test passed.
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Tidyswipe-apk
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -e
           if [ "${{ github.ref_type }}" = "tag" ]; then TAG="${{ github.ref_name }}"; else TAG="android-build-${{ github.run_number }}"; fi
+          if [ "${{ needs.test.result }}" = "success" ]; then TESTED="Passed the automated emulator test."; else TESTED="The automated emulator test did not pass for this build (${{ needs.test.result }})."; fi
           gh release create "$TAG" Tidyswipe.apk \
             --title "Tidyswipe for Android ($TAG)" \
-            --notes "Download Tidyswipe.apk on your Android phone and open it to install. Android will ask you to allow installs from your browser the first time." \
+            --notes "Download Tidyswipe.apk on your Android phone and open it to install. Android will ask you to allow installs from your browser the first time. $TESTED" \
             --target "${{ github.sha }}"
