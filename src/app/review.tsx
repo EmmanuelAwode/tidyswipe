@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MediaViewer } from '../components/MediaViewer';
 import { PendingRow, getPending, removeFromPending } from '../db/database';
@@ -26,7 +26,9 @@ export default function Review() {
   const confirm = () =>
     Alert.alert(
       `Delete ${rows.length} item${rows.length === 1 ? '' : 's'}?`,
-      `About ${formatBytes(bytes)} will be freed. iOS will ask you to confirm, and deleted items stay in Recently Deleted for 30 days.`,
+      `About ${formatBytes(bytes)} will be freed. ${Platform.OS === 'ios'
+        ? 'iOS will ask you to confirm, and deleted items stay in Recently Deleted for 30 days.'
+        : 'Android will ask you to confirm. This cannot be undone.'}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

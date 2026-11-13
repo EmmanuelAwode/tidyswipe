@@ -2,10 +2,8 @@ import { router } from 'expo-router';
 import { Alert, Platform } from 'react-native';
 import { isRandom } from './photos';
 
-/** Opens a collection. Random collections first ask how many items to review. */
+/** Opens a collection in the swipe deck. Random collections first ask how many items to review. */
 export function openCollection(key: string) {
-  if (key === 'videos') return router.push('/videos');
-  if (key === 'duplicates') return router.push('/duplicates');
   if (isRandom(key)) {
     const go = (limit: number) =>
       router.push({ pathname: '/swipe', params: { key, limit: String(limit), n: String(Date.now()) } });

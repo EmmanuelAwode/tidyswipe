@@ -7,11 +7,11 @@ import Animated, {
   FadeIn, FadeInDown, SharedValue, interpolate, useAnimatedStyle, useSharedValue,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SwipeCard, SwipeCardHandle } from '../components/SwipeCard';
+import { SwipeCard, SwipeCardHandle, formatDuration } from '../components/SwipeCard';
 import { VideoBar } from '../components/VideoBar';
 import { Button, Icon, Tap } from '../components/ui';
 import { getPending } from '../db/database';
-import { collectionTitle, formatBytes, getInfo, videoUriOf } from '../services/photos';
+import { collectionTitle, estimateSize, formatBytes, getInfo, videoUriOf } from '../services/photos';
 import { useDeck } from '../services/useDeck';
 import { Theme, useTheme } from '../theme/theme';
 
@@ -104,9 +104,13 @@ function SwipeInner() {
           <View style={styles.status}>
             <Text style={[styles.age, { color: t.text }]}>{current ? ageLabel(current.creationTime) : ' '}</Text>
             <Text style={[styles.counter, { color: t.sub }]}>
-              {batch
-                ? `${position} of ${batch}`
-                : deck.remaining !== null ? `${deck.remaining.toLocaleString()} left` : 'Loading more…'}
+              {[
+                batch ? `${position} of ${batch}`
+                  : deck.remaining !== null ? `${deck.remaining.toLocaleString()} left`
+                  : key === 'similar' ? 'Taken seconds apart'
+                  : deck.total ? `${deck.total.toLocaleString()} in this collection` : '',
+                isVideo && current ? `${formatDuration(current.duration)} · ~${formatBytes(estimateSize(current))}` : '',
+              ].filter(Boolean).join('  ·  ') || ' '}
             </Text>
             {batch ? (
               <View style={[styles.track, { backgroundColor: t.track }]}>

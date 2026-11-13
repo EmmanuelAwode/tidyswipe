@@ -23,6 +23,7 @@ export default function History() {
       ListEmptyComponent={<Text style={{ color: t.sub, textAlign: 'center' }}>No swipes yet.</Text>}
       renderItem={({ item }) => {
         const deleted = item.current === 'deleted';
+        const reversed = !deleted && item.current !== item.decision;
         return (
           <View style={[styles.row, { backgroundColor: t.card }]}>
             <Pressable disabled={deleted} onPress={() => setOpen(item.asset_id)} accessibilityRole="button" accessibilityLabel="View item">
@@ -33,10 +34,10 @@ export default function History() {
                 {item.decision === 'keep' ? 'Kept' : 'Marked for deletion'}
               </Text>
               <Text style={{ color: t.sub, fontSize: 12 }}>
-                {new Date(item.at).toLocaleString()}{deleted ? ' · deleted' : ''}
+                {new Date(item.at).toLocaleString()}{deleted ? ' · deleted' : reversed ? ' · reversed' : ''}
               </Text>
             </View>
-            {!deleted && (
+            {!deleted && !reversed && (
               <Pressable
                 onPress={() => Alert.alert('Reverse this decision?', 'The photo returns to your unreviewed pile.', [
                   { text: 'Cancel', style: 'cancel' },
@@ -54,7 +55,7 @@ export default function History() {
       ids={[...new Set(rows.filter((r) => r.current !== 'deleted').map((r) => r.asset_id))]}
       id={open}
       onClose={() => setOpen(null)}
-      actions={(id) => [{ label: 'Undo decision', icon: 'arrow.uturn.backward', then: 'close', onPress: async () => { await undoDecision(id); load(); } }]}
+      actions={(id) => rows.some((r) => r.asset_id === id && r.current === r.decision) ? [{ label: 'Undo decision', icon: 'arrow.uturn.backward', then: 'close', onPress: async () => { await undoDecision(id); load(); } }] : []}
     />
     </>
   );

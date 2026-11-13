@@ -2,7 +2,9 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { hasPhotoTools } from '../../../modules/photo-tools';
 import { Stats, getStats } from '../../db/database';
+import { openCollection } from '../../services/nav';
 import { formatBytes } from '../../services/photos';
 import { useTheme } from '../../theme/theme';
 import { Row } from './index';
@@ -36,7 +38,10 @@ export default function More() {
           {Platform.OS === 'ios' && (
             <Row t={t} icon="map.fill" tint="#34C759" title="Photo map" onPress={() => router.push('/map')} />
           )}
-          <Row t={t} icon="square.on.square" tint="#FF6B6B" title="Duplicates" onPress={() => router.push('/duplicates')} last />
+          {hasPhotoTools && (
+            <Row t={t} icon="square.on.square" tint="#FF6B6B" title="Duplicate scan" onPress={() => router.push('/duplicates')} />
+          )}
+          <Row t={t} icon="film.fill" tint="#BF5AF2" title="Large videos" onPress={() => openCollection('videos')} last />
         </View>
 
         <Text style={{ color: t.sub, fontSize: 12, textAlign: 'center', marginTop: 8 }}>

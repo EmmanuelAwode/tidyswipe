@@ -25,7 +25,7 @@ const COLLECTIONS: { key: string; title: string; icon: SFSymbol; tint: string }[
   { key: 'onthisday', title: 'On this day', icon: 'calendar', tint: '#F5A524' },
   { key: 'screenshots', title: 'Screenshots', icon: 'camera.viewfinder', tint: '#30B0C7' },
   { key: 'videos', title: 'Large videos', icon: 'film.fill', tint: '#BF5AF2' },
-  { key: 'duplicates', title: 'Duplicates', icon: 'square.on.square', tint: '#FF6B6B' },
+  { key: 'similar', title: 'Similar shots', icon: 'square.on.square', tint: '#FF6B6B' },
 ];
 
 export default function Home() {
@@ -42,7 +42,7 @@ export default function Home() {
     try {
       setStats(await getStats());
       setTotal(await countFor('recents'));
-      const keys = [...SESSIONS, ...COLLECTIONS].map((c) => c.key).filter((k) => k !== 'duplicates');
+      const keys = [...SESSIONS, ...COLLECTIONS].map((c) => c.key).filter((k) => k !== 'similar');
       for (const key of keys) {
         const entry = { count: await countFor(key), preview: await firstAssetFor(key) };
         setInfo((prev) => ({ ...prev, [key]: entry }));
@@ -146,7 +146,7 @@ export default function Home() {
           {COLLECTIONS.map((c, i) => (
             <Row
               key={c.key} t={t} icon={c.icon} tint={c.tint} title={c.title} last={i === COLLECTIONS.length - 1}
-              detail={c.key === 'duplicates' ? 'Scan' : info[c.key] ? info[c.key]!.count.toLocaleString() : ''}
+              detail={c.key === 'similar' ? '' : info[c.key] ? info[c.key]!.count.toLocaleString() : ''}
               onPress={() => openCollection(c.key)}
             />
           ))}

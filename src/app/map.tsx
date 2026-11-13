@@ -8,19 +8,21 @@ import { GeoPoint, getGeotagged } from '../../modules/photo-tools';
 import { useTheme } from '../theme/theme';
 import { uriForId } from '../services/photos';
 
-/** Native module first (PhotoKit predicate); otherwise scan up to 3000 recent assets. */
+/** Native module first (PhotoKit predicate); otherwise the newest 400 items. */
 async function loadPoints(): Promise<GeoPoint[]> {
   const native = await getGeotagged();
   if (native) return native;
+  // The asset list carries no location, so read it per item for the newest 400 (20 at a time).
+  const page = await ML.getAssetsAsync({
+    mediaType: ['photo', 'video'], first: 400, sortBy: [[ML.SortBy.creationTime, false]],
+  });
   const out: GeoPoint[] = [];
-  let after: string | undefined;
-  for (let i = 0; i < 6; i++) {
-    const page = await ML.getAssetsAsync({
-      mediaType: ['photo', 'video'], first: 500, after, sortBy: [[ML.SortBy.creationTime, false]],
-    });
-    for (const a of page.assets) if (a.location) out.push({ id: a.id, lat: a.location.latitude, lng: a.location.longitude });
-    if (!page.hasNextPage) break;
-    after = page.endCursor;
+  for (let i = 0; i < page.assets.length; i += 20) {
+    const infos = await Promise.all(page.assets.slice(i, i + 20).map((a) =>
+      ML.getAssetInfoAsync(a.id, { shouldDownloadFromNetwork: false }).catch(() => null)));
+    for (const info of infos) {
+      if (info?.location) out.push({ id: info.id, lat: info.location.latitude, lng: info.location.longitude });
+    }
   }
   return out;
 }

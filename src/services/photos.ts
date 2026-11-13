@@ -52,7 +52,7 @@ export function monthLabel(key: string): string {
 export function collectionTitle(key: CollectionKey): string {
   if (key.startsWith('month:')) return monthLabel(key.slice(6));
   return (
-    { recents: 'Recents', random: 'Random mix', 'random:photo': 'Random photos', 'random:video': 'Random videos', onthisday: 'On This Day', screenshots: 'Screenshots', videos: 'Large Videos' } as Record<string, string>
+    { recents: 'Recents', random: 'Random mix', 'random:photo': 'Random photos', 'random:video': 'Random videos', onthisday: 'On This Day', screenshots: 'Screenshots', videos: 'Large videos', similar: 'Similar shots' } as Record<string, string>
   )[key] ?? key;
 }
 
@@ -92,6 +92,7 @@ export async function countFor(key: CollectionKey): Promise<number> {
     const l = await createLoader(key).next();
     return l.length;
   }
+  if (key === 'similar') return 0; // unknown until the library has been walked
   if (isRandom(key)) {
     const m = mediaOf(key);
     return (await ML.getAssetsAsync({ ...(await baseOptions('recents', m)), first: 1 })).totalCount;
@@ -132,6 +133,7 @@ export type Loader = { next(): Promise<PhotoAsset[]>; done: boolean };
 /** Paged loader: fetches one page at a time; the library is never loaded whole. */
 export function createLoader(key: CollectionKey, pageSize = 60, media?: Media): Loader {
   if (key === 'onthisday') return onThisDayLoader();
+  if (key === 'similar') return similarLoader();
   if (isRandom(key)) return randomLoader(pageSize, mediaOf(key));
   let cursor: string | undefined;
   const loader: Loader = {
@@ -177,6 +179,48 @@ function randomLoader(pageSize: number, media?: Media): Loader {
       }
       if (pool.length === 0) loader.done = true;
       return shuffle(out);
+    },
+  };
+  return loader;
+}
+
+/**
+ * Near-duplicates without any native code: photos with the same dimensions taken
+ * within a few seconds of each other (bursts, retakes, repeated screenshots).
+ * Walks the library newest first and yields each run together, so the similar
+ * shots arrive back to back in the deck.
+ */
+function similarLoader(): Loader {
+  let cursor: string | undefined;
+  let run: PhotoAsset[] = [];
+  const loader: Loader = {
+    done: false,
+    async next() {
+      if (loader.done) return [];
+      const out: PhotoAsset[] = [];
+      // Keep paging until something turns up, so the deck is not starved by long stretches of unique photos.
+      while (out.length === 0 && !loader.done) {
+        const page = await ML.getAssetsAsync({
+          mediaType: ['photo'], first: 500, after: cursor, sortBy: [[ML.SortBy.creationTime, false]],
+        });
+        for (const a of page.assets) {
+          const last = run[run.length - 1];
+          const same = last && last.width === a.width && last.height === a.height
+            && Math.abs(last.creationTime - a.creationTime) <= 4000;
+          if (same) run.push(a);
+          else {
+            if (run.length > 1) out.push(...run);
+            run = [a];
+          }
+        }
+        cursor = page.endCursor;
+        if (!page.hasNextPage) {
+          if (run.length > 1) out.push(...run);
+          run = [];
+          loader.done = true;
+        }
+      }
+      return out;
     },
   };
   return loader;

@@ -20,7 +20,6 @@ export default function RootLayout() {
         <Stack.Screen name="swipe" options={{ title: '' }} />
         <Stack.Screen name="duplicates" options={{ title: 'Duplicates' }} />
         <Stack.Screen name="duplicate" options={{ title: 'Compare' }} />
-        <Stack.Screen name="videos" options={{ title: 'Large Videos' }} />
         <Stack.Screen name="bookmarks" options={{ title: 'Bookmarks' }} />
         <Stack.Screen name="stats" options={{ title: 'Statistics' }} />
         <Stack.Screen name="history" options={{ title: 'Undo History' }} />
