@@ -3,7 +3,6 @@ import { SFSymbol } from 'expo-symbols';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Icon, Tap } from '../../components/ui';
 import { Stats, getStats } from '../../db/database';
@@ -99,7 +98,7 @@ export default function Home() {
         )}
 
         {/* Hero: overall progress at a glance */}
-        <Animated.View entering={FadeInDown.duration(300)} style={[styles.hero, { backgroundColor: t.accent }]}>
+        <View style={[styles.hero, { backgroundColor: t.accent }]}>
           <Text style={styles.heroLabel}>Library cleaned</Text>
           <Text style={styles.heroPct}>{Math.round(pct * 100)}%</Text>
           <View style={styles.heroTrack}>
@@ -110,7 +109,7 @@ export default function Home() {
             <HeroStat value={formatBytes(stats?.bytesCleaned ?? 0)} label="freed" />
             <HeroStat value={`${stats?.streak ?? 0}`} label="day streak" />
           </View>
-        </Animated.View>
+        </View>
 
         {(stats?.pending ?? 0) > 0 && (
           <Tap onPress={() => router.push('/review')} style={[styles.pending, { backgroundColor: t.del + '22' }]}>

@@ -26,6 +26,7 @@ export function Icon({ name, size = 22, color }: { name: SFSymbol; size?: number
 }
 
 const SPRING = { damping: 18, stiffness: 320 };
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /** Pressable that gives immediate physical feedback: it dips on touch and springs back. */
 export function Tap({
@@ -41,7 +42,7 @@ export function Tap({
   const s = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={label}
       disabled={disabled}
@@ -49,9 +50,10 @@ export function Tap({
       onPress={onPress}
       onPressIn={() => { s.value = withSpring(0.92, SPRING); }}
       onPressOut={() => { s.value = withSpring(1, SPRING); }}
+      style={[style, anim, disabled && { opacity: 0.3 }]}
     >
-      <Animated.View style={[style, anim, disabled && { opacity: 0.3 }]}>{children}</Animated.View>
-    </Pressable>
+      {children}
+    </AnimatedPressable>
   );
 }
 

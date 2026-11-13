@@ -232,6 +232,7 @@ def main():
     tap(dump(), 'Recents')
     time.sleep(8)
     shot('05-deck-first-card')
+    dump()  # clears any "not responding" pop-up before touching the card
     swipe_card('right', w, h)   # keep
     shot('06-after-keep')
     swipe_card('left', w, h)    # delete
@@ -286,11 +287,18 @@ def main():
     check('Photos were really removed from the gallery', left < 9, f'{left} images still there')
 
     # ---- Statistics / history / bookmarks ----
+    time.sleep(8)
+    shot('16b-after-deletion-settled')
     nodes = show('After deletion')
-    for _ in range(2):
-        if find(nodes, 'Statistics'):
-            break
-        back()
+    if not find(nodes, 'Statistics'):
+        if find(nodes, 'Clean') or find(nodes, 'More'):
+            tap(nodes, 'More', which=-1)
+        else:
+            back()
+            time.sleep(2)
+            nodes = dump()
+            if find(nodes, 'More') and not find(nodes, 'Statistics'):
+                tap(nodes, 'More', which=-1)
         nodes = dump()
     tap(nodes, 'Statistics')
     nodes = show('Statistics')

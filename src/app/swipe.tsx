@@ -3,9 +3,7 @@ import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { VideoPlayer, VideoView, useVideoPlayer } from 'expo-video';
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  FadeIn, FadeInDown, SharedValue, interpolate, useAnimatedStyle, useSharedValue,
-} from 'react-native-reanimated';
+import Animated, { SharedValue, interpolate, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SwipeCard, SwipeCardHandle, formatDuration } from '../components/SwipeCard';
 import { ShareButton } from '../components/ShareButton';
@@ -212,10 +210,10 @@ function Summary({ t, batch, kept, del, onReview, onNext }: {
   t: Theme; batch?: number; kept: number; del: number; onReview: () => void; onNext?: () => void;
 }) {
   return (
-    <Animated.View entering={FadeInDown.duration(280)} style={styles.summary}>
-      <Animated.View entering={FadeIn.delay(120)} style={[styles.badge, { backgroundColor: t.keep + '24' }]}>
+    <View style={styles.summary}>
+      <View style={[styles.badge, { backgroundColor: t.keep + '24' }]}>
         <Icon name="checkmark" size={34} color={t.keep} />
-      </Animated.View>
+      </View>
       <Text style={[styles.title, { color: t.text }]}>{onNext ? 'Batch done' : 'All caught up'}</Text>
 
       <View style={styles.stats}>
@@ -243,7 +241,7 @@ function Summary({ t, batch, kept, del, onReview, onNext }: {
           <Text style={{ color: t.sub, fontWeight: '600' }}>Back to home</Text>
         </Tap>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
