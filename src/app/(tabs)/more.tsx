@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
+import { LastError, clearLastError, getLastError } from '../../services/crash';
 import React, { useCallback, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { hasPhotoTools } from '../../../modules/photo-tools';
 import { Stats, getStats } from '../../db/database';
@@ -12,7 +13,11 @@ import { Row } from './index';
 export default function More() {
   const t = useTheme();
   const [s, setS] = useState<Stats | null>(null);
-  useFocusEffect(useCallback(() => { void getStats().then(setS).catch(() => {}); }, []));
+  const [err, setErr] = useState<LastError | null>(null);
+  useFocusEffect(useCallback(() => {
+    void getStats().then(setS).catch(() => {});
+    void getLastError().then(setErr);
+  }, []));
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1 }}>
@@ -43,6 +48,19 @@ export default function More() {
           )}
           <Row t={t} icon="film.fill" tint="#BF5AF2" title="Large videos" onPress={() => openCollection('videos')} last />
         </View>
+
+        {err && (
+          <Pressable
+            onPress={() => Alert.alert('Last problem', `${err.text}\n\n${new Date(err.at).toLocaleString()}`, [
+              { text: 'Clear', onPress: () => { void clearLastError(); setErr(null); } },
+              { text: 'Close', style: 'cancel' },
+            ])}
+            style={[styles.list, { backgroundColor: t.card, padding: 14 }]}
+          >
+            <Text style={{ color: t.del, fontWeight: '700' }}>The app recorded a problem</Text>
+            <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={2}>{err.text}</Text>
+          </Pressable>
+        )}
 
         <Text style={{ color: t.sub, fontSize: 12, textAlign: 'center', marginTop: 8 }}>
           Everything stays on this device. No account, no uploads.

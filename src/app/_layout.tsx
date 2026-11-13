@@ -1,13 +1,18 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { installCrashGuard } from '../services/crash';
 import { useTheme } from '../theme/theme';
+
+installCrashGuard();
 
 export default function RootLayout() {
   const t = useTheme();
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: t.bg }}>
       <StatusBar style="auto" />
+      <ErrorBoundary>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: t.bg },
@@ -26,6 +31,7 @@ export default function RootLayout() {
         <Stack.Screen name="map" options={{ title: 'Photo Map' }} />
         <Stack.Screen name="review" options={{ title: 'Confirm deletion', presentation: 'modal' }} />
       </Stack>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

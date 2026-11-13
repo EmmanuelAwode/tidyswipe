@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { VideoPlayer, VideoView, useVideoPlayer } from 'expo-video';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { SharedValue, interpolate, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,11 +30,54 @@ function SwipeInner() {
   const [fullscreen, setFullscreen] = useState(false);
   const [details, setDetails] = useState<string | null>(null);
   const [videoUri, setVideoUri] = useState<string | null>(null);
-  const [cardPlayer, setCardPlayer] = useState<VideoPlayer | null>(null);
+  // One player for the whole screen. Making a player per card exhausted the phone's video
+  // decoders when swiping quickly; swapping the source on a single player does not.
+  const player = useVideoPlayer(null, (p) => {
+    p.loop = true;
+    p.muted = false;
+    p.timeUpdateEventInterval = 0.25;
+  });
+  const [readyId, setReadyId] = useState<string | null>(null);
+  const readyRef = useRef<string | null>(null);
+  readyRef.current = readyId;
   const reviewing = useRef(false);
 
   const current = deck.finished ? undefined : deck.queue[0];
   const ended = deck.finished || (!current && deck.exhausted);
+
+  // Load a card's video only once you rest on it for a moment, so flicking past a run of videos
+  // never starts (and then abandons) a load for each one.
+  const videoId = current?.mediaType === 'video' ? current.id : null;
+  const videoUriNow = current?.mediaType === 'video' ? videoUriOf(current) : null;
+  useEffect(() => {
+    try { player.pause(); } catch { /* released */ }
+    setReadyId(null);
+    if (!videoId || !videoUriNow) return;
+    let live = true;
+    const timer = setTimeout(async () => {
+      try {
+        await player.replaceAsync(videoUriNow);
+        if (!live) return;
+        player.play();
+        setReadyId(videoId);
+      } catch (e) {
+        console.log('[video] could not load', e);
+      }
+    }, 220);
+    return () => { live = false; clearTimeout(timer); };
+  }, [videoId, videoUriNow, player]);
+
+  // Silence it whenever this screen is covered (review screen, another tab) and resume on return.
+  useFocusEffect(useCallback(() => {
+    try { if (readyRef.current) player.play(); } catch { /* released */ }
+    return () => { try { player.pause(); } catch { /* released */ } };
+  }, [player]));
+  useEffect(() => {
+    try {
+      if (videoUri) player.pause();
+      else if (readyRef.current) player.play();
+    } catch { /* released */ }
+  }, [videoUri, player]);
 
   const nextBatch = useCallback(
     () => router.replace({ pathname: '/swipe', params: { key, limit, n: String(Date.now()) } }),
@@ -130,7 +173,8 @@ function SwipeInner() {
                   asset={current}
                   handleRef={top}
                   progress={progress}
-                  onPlayer={setCardPlayer}
+                  player={player}
+                  videoReady={!!current && readyId === current.id}
                   onSwiped={(d) => deck.decide(d === 'right' ? 'keep' : 'delete')}
                 />
                 {/* Secondary actions sit on the media, out of the way of the main choice */}
@@ -151,7 +195,7 @@ function SwipeInner() {
             )}
           </View>
 
-          {isVideo && cardPlayer ? <VideoBar player={cardPlayer} color={t.text} sub={t.sub} /> : null}
+          {isVideo && current ? <VideoBar key={`${current.id}:${readyId === current.id}`} player={player} color={t.text} sub={t.sub} /> : null}
 
           {/* Primary choice: two large, labelled, colour-coded targets */}
           <View style={styles.actions}>

@@ -138,6 +138,8 @@ def seed_media():
     for i in range(1, 4):
         sh(f'screencap -p /sdcard/Pictures/Screenshots/Screenshot_{i}.png')
     print('  video:', sh('screenrecord --time-limit 4 /sdcard/DCIM/Camera/VID_0001.mp4', timeout=30).strip()[:200])
+    for i in range(2, 7):
+        sh(f'cp /sdcard/DCIM/Camera/VID_0001.mp4 /sdcard/DCIM/Camera/VID_000{i}.mp4')
     # Make sure MediaStore has indexed the new files.
     sh('content call --uri content://media/ --method scan_volume --arg external_primary')
     time.sleep(6)
@@ -328,6 +330,15 @@ def main():
     tap(nodes, 'Large videos')
     time.sleep(6)
     shot('20-large-videos')
+    # Flick through the videos faster than they can load; this used to exhaust the phone's decoders.
+    for _ in range(8):
+        sh(f'input swipe {int(w * 0.2)} {int(h * 0.45)} {int(w * 0.85)} {int(h * 0.45)} 120')
+        time.sleep(0.35)
+    time.sleep(3)
+    shot('20b-after-fast-video-swipes')
+    check('Fast swiping through videos does not crash',
+          'FATAL' not in adb('logcat', '-d', '-s', 'AndroidRuntime:E') and bool(find(dump(), 'Keep') or find(dump(), 'All caught up', exact=False)),
+          critical=True)
     back()
     tap(dump(), 'Clean', which=-1)
     time.sleep(1.5)

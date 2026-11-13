@@ -119,6 +119,12 @@ function Page({ id, width, active }: { id: string; width: number; active: boolea
   const [asset, setAsset] = useState<PhotoAsset | null>(null);
   const [missing, setMissing] = useState(false);
   const [unknown, setUnknown] = useState(false);
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!active) { setSettled(false); return; }
+    const t = setTimeout(() => setSettled(true), 250); // paging quickly past videos starts nothing
+    return () => clearTimeout(t);
+  }, [active]);
   useEffect(() => {
     let live = true;
     getInfo(id)
@@ -134,7 +140,7 @@ function Page({ id, width, active }: { id: string; width: number; active: boolea
       {missing && <View style={styles.fill}><Text style={{ color: '#fff' }}>This item is no longer in your library.</Text></View>}
       {!asset && !missing && !unknown && <View style={styles.fill}><ActivityIndicator color="#fff" /></View>}
       {/* Only the page on screen plays, so sound never comes from a neighbour. */}
-      {asset?.mediaType === 'video' && active && <Video uri={videoUriOf(asset)} />}
+      {asset?.mediaType === 'video' && active && settled && <Video uri={videoUriOf(asset)} />}
     </View>
   );
 }

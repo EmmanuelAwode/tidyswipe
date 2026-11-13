@@ -1,8 +1,7 @@
 import { Image } from 'expo-image';
-import { useEventListener } from 'expo';
-import { VideoPlayer, VideoView, useVideoPlayer } from 'expo-video';
-import React, { useEffect, useImperativeHandle } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { VideoPlayer, VideoView } from 'expo-video';
+import React, { useImperativeHandle } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   SharedValue,
@@ -16,7 +15,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import type { PhotoAsset } from '../services/photos';
-import { videoUriOf } from '../services/photos';
 
 export type Dir = 'left' | 'right';
 export type SwipeCardHandle = { fling(dir: Dir): void };
@@ -28,13 +26,14 @@ type Props = {
   onTap?: () => void;
   /** Mirrors |translateX| / threshold (0..1) so cards behind can animate forward. */
   progress?: SharedValue<number>;
-  /** Receives the card's video player (or null) so the screen can show seek controls. */
-  onPlayer?: (p: VideoPlayer | null) => void;
+  /** The screen's single reusable video player; it only draws once it has loaded this card's video. */
+  player?: VideoPlayer | null;
+  videoReady?: boolean;
 };
 
 const THRESHOLD = 110;
 
-export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress, onPlayer }: Props) {
+export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress, player, videoReady }: Props) {
   const { width } = useWindowDimensions();
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
@@ -98,7 +97,21 @@ export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress, onPlaye
           recyclingKey={asset.id}
           transition={120}
         />
-        {asset.mediaType === 'video' && <InlinePlayer uri={videoUriOf(asset)} onPlayer={onPlayer} />}
+        {asset.mediaType === 'video' && player && videoReady && (
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            nativeControls={false}
+            allowsPictureInPicture={false}
+            pointerEvents="none"
+          />
+        )}
+        {asset.mediaType === 'video' && !videoReady && (
+          <View style={styles.loading} pointerEvents="none">
+            <ActivityIndicator color="#fff" />
+          </View>
+        )}
         {asset.mediaType === 'video' && (
           <View style={styles.badge} pointerEvents="none">
             <Text style={styles.badgeText}>▶ {formatDuration(asset.duration)}</Text>
@@ -113,36 +126,6 @@ export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress, onPlaye
         {onTap ? <View style={StyleSheet.absoluteFill} pointerEvents="none" /> : null}
       </Animated.View>
     </GestureDetector>
-  );
-}
-
-/**
- * Autoplays the video with sound (looping) on the top card. On iOS it uses the PhotoKit URI
- * (ph://) directly: expo-video asks PhotoKit for a playable asset, which is the
- * only way iOS grants read access. Plain file:// paths into the library are denied.
- */
-function InlinePlayer({ uri, onPlayer }: { uri: string; onPlayer?: (p: VideoPlayer | null) => void }) {
-  const player = useVideoPlayer(uri, (p) => {
-    p.muted = false;
-    p.loop = true;
-    p.play();
-  });
-  useEffect(() => {
-    onPlayer?.(player);
-    return () => onPlayer?.(null);
-  }, [player, onPlayer]);
-  useEventListener(player, 'statusChange', ({ status, error }) => {
-    if (error) console.log(`[video] ${status} - ${error.message}`);
-  });
-  return (
-    <VideoView
-      player={player}
-      style={StyleSheet.absoluteFill}
-      contentFit="cover"
-      nativeControls={false}
-      allowsPictureInPicture={false}
-      pointerEvents="none"
-    />
   );
 }
 
@@ -162,6 +145,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
+  loading: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute', bottom: 16, left: 16, backgroundColor: 'rgba(0,0,0,0.55)',
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,

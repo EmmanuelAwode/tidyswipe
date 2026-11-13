@@ -115,7 +115,8 @@ export async function listMonths(): Promise<string[]> {
   const oldest = await ML.getAssetsAsync({ ...common, sortBy: [[ML.SortBy.creationTime, true]] });
   if (!newest.assets[0] || !oldest.assets[0]) return [];
   const end = new Date(newest.assets[0].creationTime);
-  const start = new Date(oldest.assets[0].creationTime);
+  // Items with no date taken show up as 1970; start no earlier than 2000 so that does not mean 650 empty months.
+  const start = new Date(Math.max(oldest.assets[0].creationTime, new Date(2000, 0, 1).getTime()));
   const keys: string[] = [];
   let y = end.getFullYear();
   let m = end.getMonth();
