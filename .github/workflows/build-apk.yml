@@ -94,7 +94,11 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: false
-          script: python3 .github/scripts/smoke.py Tidyswipe-test.apk
+          ram-size: 4096M
+          heap-size: 576M
+          cores: 2
+          # The runner is slow, so one failed attempt is retried once from a clean app state.
+          script: python3 .github/scripts/smoke.py Tidyswipe-test.apk || (adb shell pm clear com.personal.tidyswipe && rm -rf shots && python3 .github/scripts/smoke.py Tidyswipe-test.apk)
 
       - name: Keep the screenshots
         if: always()

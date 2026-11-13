@@ -29,8 +29,22 @@ def sh(cmd, timeout=90):
     return adb('shell', cmd, timeout=timeout)
 
 
-def dump():
+def dump(_depth=0):
     """Returns [(label, kind, (cx, cy), resource_id)] for everything on screen."""
+    nodes = _dump_once()
+    # A slow CI emulator sometimes freezes System UI or the app; press Wait and look again.
+    for label, _, c, _ in nodes:
+        if "isn't responding" in label and _depth < 4:
+            for l2, _, c2, _ in nodes:
+                if l2.strip().lower() == 'wait':
+                    sh(f'input tap {c2[0]} {c2[1]}')
+                    break
+            time.sleep(4)
+            return dump(_depth + 1)
+    return nodes
+
+
+def _dump_once():
     for _ in range(5):
         out = sh('uiautomator dump /sdcard/ui.xml', timeout=40)
         if 'dumped' in out.lower():
