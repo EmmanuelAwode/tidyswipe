@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFileSizes } from '../../modules/photo-tools';
 import { setDecision } from '../db/database';
 import { DupGroup, loadAllGroups, resolveGroup } from '../services/duplicates';
-import { formatBytes } from '../services/photos';
+import { formatBytes, uriForId } from '../services/photos';
 import { useTheme } from '../theme/theme';
 
 export default function Compare() {
@@ -47,7 +47,7 @@ export default function Compare() {
         {group.ids.map((id) => (
           <Pressable key={id} style={styles.cell} onPress={() => setKeeper(id)}>
             <Image
-              source={{ uri: `ph://${id}` }}
+              source={{ uri: uriForId(id) }}
               style={[styles.img, { borderColor: id === keeper ? t.keep : 'transparent' }]}
               contentFit="cover"
             />

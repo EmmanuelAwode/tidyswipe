@@ -16,7 +16,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: t.bg },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Tidyswipe', headerLargeTitle: true }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Home' }} />
         <Stack.Screen name="swipe" options={{ title: '' }} />
         <Stack.Screen name="duplicates" options={{ title: 'Duplicates' }} />
         <Stack.Screen name="duplicate" options={{ title: 'Compare' }} />

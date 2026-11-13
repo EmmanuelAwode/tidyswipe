@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PendingRow, getPending, removeFromPending } from '../db/database';
 import { deletePending } from '../services/deletion';
-import { formatBytes } from '../services/photos';
+import { formatBytes, uriForId } from '../services/photos';
 import { useTheme } from '../theme/theme';
 
 export default function Review() {
@@ -68,7 +68,7 @@ export default function Review() {
               { text: 'Keep it', onPress: async () => { await removeFromPending(item.asset_id); void load(); } },
             ])}
           >
-            <Image source={{ uri: `ph://${item.asset_id}` }} style={styles.thumb} contentFit="cover" recyclingKey={item.asset_id} />
+            <Image source={{ uri: uriForId(item.asset_id) }} style={styles.thumb} contentFit="cover" recyclingKey={item.asset_id} />
           </Pressable>
         )}
       />

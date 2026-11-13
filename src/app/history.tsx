@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { HistoryRow, getHistory, undoDecision } from '../db/database';
 import { useTheme } from '../theme/theme';
+import { uriForId } from '../services/photos';
 
 export default function History() {
   const t = useTheme();
@@ -21,7 +22,7 @@ export default function History() {
         const deleted = item.current === 'deleted';
         return (
           <View style={[styles.row, { backgroundColor: t.card }]}>
-            <Image source={{ uri: `ph://${item.asset_id}` }} style={styles.thumb} contentFit="cover" />
+            <Image source={{ uri: uriForId(item.asset_id) }} style={styles.thumb} contentFit="cover" />
             <View style={{ flex: 1 }}>
               <Text style={{ color: item.decision === 'keep' ? t.keep : t.del, fontWeight: '700' }}>
                 {item.decision === 'keep' ? 'Kept' : 'Marked for deletion'}

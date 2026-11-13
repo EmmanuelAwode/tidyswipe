@@ -1,5 +1,7 @@
 import { Image } from 'expo-image';
-import React, { useImperativeHandle } from 'react';
+import { useEventListener } from 'expo';
+import { VideoPlayer, VideoView, useVideoPlayer } from 'expo-video';
+import React, { useEffect, useImperativeHandle } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
@@ -14,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import type { PhotoAsset } from '../services/photos';
+import { videoUriOf } from '../services/photos';
 
 export type Dir = 'left' | 'right';
 export type SwipeCardHandle = { fling(dir: Dir): void };
@@ -25,11 +28,13 @@ type Props = {
   onTap?: () => void;
   /** Mirrors |translateX| / threshold (0..1) so cards behind can animate forward. */
   progress?: SharedValue<number>;
+  /** Receives the card's video player (or null) so the screen can show seek controls. */
+  onPlayer?: (p: VideoPlayer | null) => void;
 };
 
 const THRESHOLD = 110;
 
-export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress }: Props) {
+export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress, onPlayer }: Props) {
   const { width } = useWindowDimensions();
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
@@ -93,8 +98,9 @@ export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress }: Props
           recyclingKey={asset.id}
           transition={120}
         />
+        {asset.mediaType === 'video' && <InlinePlayer uri={videoUriOf(asset)} onPlayer={onPlayer} />}
         {asset.mediaType === 'video' && (
-          <View style={styles.badge}>
+          <View style={styles.badge} pointerEvents="none">
             <Text style={styles.badgeText}>▶ {formatDuration(asset.duration)}</Text>
           </View>
         )}
@@ -107,6 +113,36 @@ export function SwipeCard({ asset, onSwiped, handleRef, onTap, progress }: Props
         {onTap ? <View style={StyleSheet.absoluteFill} pointerEvents="none" /> : null}
       </Animated.View>
     </GestureDetector>
+  );
+}
+
+/**
+ * Autoplays the video with sound (looping) on the top card. On iOS it uses the PhotoKit URI
+ * (ph://) directly: expo-video asks PhotoKit for a playable asset, which is the
+ * only way iOS grants read access. Plain file:// paths into the library are denied.
+ */
+function InlinePlayer({ uri, onPlayer }: { uri: string; onPlayer?: (p: VideoPlayer | null) => void }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.muted = false;
+    p.loop = true;
+    p.play();
+  });
+  useEffect(() => {
+    onPlayer?.(player);
+    return () => onPlayer?.(null);
+  }, [player, onPlayer]);
+  useEventListener(player, 'statusChange', ({ status, error }) => {
+    if (error) console.log(`[video] ${status} - ${error.message}`);
+  });
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+      allowsPictureInPicture={false}
+      pointerEvents="none"
+    />
   );
 }
 

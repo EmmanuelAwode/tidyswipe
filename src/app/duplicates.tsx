@@ -5,7 +5,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { hasPhotoTools } from '../../modules/photo-tools';
 import { DupGroup, isScanned, loadAllGroups, scanMonth } from '../services/duplicates';
-import { listMonths, monthLabel } from '../services/photos';
+import { listMonths, monthLabel, uriForId } from '../services/photos';
 import { useTheme } from '../theme/theme';
 
 type Item = { month: string; group: DupGroup };
@@ -66,7 +66,7 @@ export default function Duplicates() {
           >
             <View style={styles.thumbs}>
               {item.group.ids.slice(0, 3).map((id) => (
-                <Image key={id} source={{ uri: `ph://${id}` }} style={styles.thumb} contentFit="cover" />
+                <Image key={id} source={{ uri: uriForId(id) }} style={styles.thumb} contentFit="cover" />
               ))}
             </View>
             <View style={{ flex: 1 }}>

@@ -15,7 +15,7 @@ const BUFFER = 8;
  * that already have a decision (so reopening resumes where you left off) and
  * persists each swipe immediately.
  */
-export function useDeck(key: CollectionKey) {
+export function useDeck(key: CollectionKey, limit?: number) {
   const [queue, setQueue] = useState<PhotoAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [exhausted, setExhausted] = useState(false);
@@ -23,10 +23,11 @@ export function useDeck(key: CollectionKey) {
   const [total, setTotal] = useState(0);
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [canUndo, setCanUndo] = useState(false);
+  const [session, setSession] = useState({ keep: 0, del: 0 });
 
   const loader = useRef<Loader | null>(null);
   const filling = useRef(false);
-  const undoStack = useRef<PhotoAsset[]>([]);
+  const undoStack = useRef<{ asset: PhotoAsset; dir: 'keep' | 'delete' }[]>([]);
   const queueRef = useRef<PhotoAsset[]>([]);
   queueRef.current = queue;
 
@@ -80,7 +81,8 @@ export function useDeck(key: CollectionKey) {
     Haptics.impactAsync(
       dir === 'keep' ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium,
     );
-    undoStack.current.push(asset);
+    undoStack.current.push({ asset, dir });
+    setSession((x) => (dir === 'keep' ? { ...x, keep: x.keep + 1 } : { ...x, del: x.del + 1 }));
     queueRef.current = queueRef.current.slice(1);
     setQueue(queueRef.current);
     setCanUndo(true);
@@ -91,8 +93,10 @@ export function useDeck(key: CollectionKey) {
   }, [fill]);
 
   const undo = useCallback(async () => {
-    const asset = undoStack.current.pop();
-    if (!asset) return;
+    const last = undoStack.current.pop();
+    if (!last) return;
+    const { asset, dir } = last;
+    setSession((x) => (dir === 'keep' ? { ...x, keep: x.keep - 1 } : { ...x, del: x.del - 1 }));
     Haptics.selectionAsync();
     await undoDecision(asset.id);
     queueRef.current = [asset, ...queueRef.current];
@@ -113,5 +117,7 @@ export function useDeck(key: CollectionKey) {
     });
   }, []);
 
-  return { queue, loading, exhausted, remaining, total, bookmarks, canUndo, decide, undo, bookmark };
+  const done = session.keep + session.del;
+  const finished = !!limit && done >= limit;
+  return { session, finished, done, queue, loading, exhausted, remaining, total, bookmarks, canUndo, decide, undo, bookmark };
 }

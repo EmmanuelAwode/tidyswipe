@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View }
 import MapView, { Marker, Region } from 'react-native-maps';
 import { GeoPoint, getGeotagged } from '../../modules/photo-tools';
 import { useTheme } from '../theme/theme';
+import { uriForId } from '../services/photos';
 
 /** Native module first (PhotoKit predicate); otherwise scan up to 3000 recent assets. */
 async function loadPoints(): Promise<GeoPoint[]> {
@@ -82,7 +83,7 @@ export default function PhotoMap() {
             data={open ?? []} numColumns={3} keyExtractor={(i) => i}
             renderItem={({ item }) => (
               <View style={styles.cell}>
-                <Image source={{ uri: `ph://${item}` }} style={styles.thumb} contentFit="cover" recyclingKey={item} />
+                <Image source={{ uri: uriForId(item) }} style={styles.thumb} contentFit="cover" recyclingKey={item} />
               </View>
             )}
           />

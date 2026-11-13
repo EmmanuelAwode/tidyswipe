@@ -1,4 +1,5 @@
 import * as ML from 'expo-media-library/legacy';
+import { Platform } from 'react-native';
 import { getFileSizes } from '../../modules/photo-tools';
 
 export type Access = 'all' | 'limited' | 'denied' | 'undetermined';
@@ -16,6 +17,21 @@ export async function requestAccess(): Promise<Access> {
   return mapAccess(await ML.requestPermissionsAsync());
 }
 export const manageLimited = () => ML.presentPermissionsPickerAsync();
+
+/** Image source for an asset we only know by id. iOS: PhotoKit; Android: MediaStore. */
+export const uriForId = (id: string) =>
+  Platform.OS === 'ios' ? `ph://${id}` : `content://media/external/file/${id}`;
+/** Playable source for a video. iOS only grants access through PhotoKit (ph://). */
+export const videoUriOf = (a: { id: string; uri: string }) => (Platform.OS === 'ios' ? `ph://${a.id}` : a.uri);
+
+// Android has no "screenshot" subtype; screenshots live in an album called Screenshots.
+let shotsAlbum: Promise<string | null> | null = null;
+function screenshotsAlbum(): Promise<string | null> {
+  shotsAlbum ??= ML.getAlbumsAsync()
+    .then((all) => all.find((a) => a.title.toLowerCase() === 'screenshots')?.id ?? null)
+    .catch(() => null);
+  return shotsAlbum;
+}
 
 // ---------- Collections ----------
 // Keys: 'recents' | 'random' | 'onthisday' | 'screenshots' | 'videos' | 'month:YYYY-MM'
@@ -36,18 +52,29 @@ export function monthLabel(key: string): string {
 export function collectionTitle(key: CollectionKey): string {
   if (key.startsWith('month:')) return monthLabel(key.slice(6));
   return (
-    { recents: 'Recents', random: 'Random', onthisday: 'On This Day', screenshots: 'Screenshots', videos: 'Large Videos' } as Record<string, string>
+    { recents: 'Recents', random: 'Random mix', 'random:photo': 'Random photos', 'random:video': 'Random videos', onthisday: 'On This Day', screenshots: 'Screenshots', videos: 'Large Videos' } as Record<string, string>
   )[key] ?? key;
 }
 
-function baseOptions(key: CollectionKey): ML.AssetsOptions {
+export const isRandom = (key: CollectionKey) => key === 'random' || key.startsWith('random:');
+type Media = 'photo' | 'video';
+const mediaOf = (key: CollectionKey): Media | undefined =>
+  key === 'random:photo' ? 'photo' : key === 'random:video' ? 'video' : undefined;
+
+async function baseOptions(key: CollectionKey, media?: Media): Promise<ML.AssetsOptions> {
   const opts: ML.AssetsOptions = {
-    mediaType: ['photo', 'video'],
+    mediaType: media ? [media] : ['photo', 'video'],
     sortBy: [[ML.SortBy.creationTime, false]],
   };
   if (key === 'screenshots') {
     opts.mediaType = ['photo'];
-    opts.mediaSubtypes = ['screenshot'];
+    if (Platform.OS === 'ios') opts.mediaSubtypes = ['screenshot'];
+    else {
+      const album = await screenshotsAlbum();
+      // No Screenshots album: match nothing rather than the whole library.
+      if (album) opts.album = album;
+      else opts.createdBefore = 1;
+    }
   } else if (key === 'videos') {
     opts.mediaType = ['video'];
     opts.sortBy = [[ML.SortBy.duration, false]]; // longest first, a proxy for largest
@@ -65,13 +92,17 @@ export async function countFor(key: CollectionKey): Promise<number> {
     const l = await createLoader(key).next();
     return l.length;
   }
-  const page = await ML.getAssetsAsync({ ...baseOptions(key), first: 1 });
+  if (isRandom(key)) {
+    const m = mediaOf(key);
+    return (await ML.getAssetsAsync({ ...(await baseOptions('recents', m)), first: 1 })).totalCount;
+  }
+  const page = await ML.getAssetsAsync({ ...(await baseOptions(key)), first: 1 });
   return page.totalCount;
 }
 
 export async function firstAssetFor(key: CollectionKey): Promise<PhotoAsset | null> {
   if (key === 'onthisday') return (await createLoader(key).next())[0] ?? null;
-  const page = await ML.getAssetsAsync({ ...baseOptions(key), first: 1 });
+  const page = await ML.getAssetsAsync({ ...(await baseOptions(isRandom(key) ? 'recents' : key, mediaOf(key))), first: 1 });
   return page.assets[0] ?? null;
 }
 
@@ -99,15 +130,15 @@ export async function listMonths(): Promise<string[]> {
 export type Loader = { next(): Promise<PhotoAsset[]>; done: boolean };
 
 /** Paged loader: fetches one page at a time; the library is never loaded whole. */
-export function createLoader(key: CollectionKey, pageSize = 60): Loader {
+export function createLoader(key: CollectionKey, pageSize = 60, media?: Media): Loader {
   if (key === 'onthisday') return onThisDayLoader();
-  if (key === 'random') return randomLoader(pageSize);
+  if (isRandom(key)) return randomLoader(pageSize, mediaOf(key));
   let cursor: string | undefined;
   const loader: Loader = {
     done: false,
     async next() {
       if (loader.done) return [];
-      const page = await ML.getAssetsAsync({ ...baseOptions(key), first: pageSize, after: cursor });
+      const page = await ML.getAssetsAsync({ ...(await baseOptions(key, media)), first: pageSize, after: cursor });
       cursor = page.endCursor;
       loader.done = !page.hasNextPage;
       return page.assets;
@@ -116,22 +147,36 @@ export function createLoader(key: CollectionKey, pageSize = 60): Loader {
   return loader;
 }
 
-function randomLoader(pageSize: number): Loader {
-  let queue: string[] | null = null;
-  let current: Loader | null = null;
+/**
+ * Random across the whole library: each call draws a few items from several
+ * randomly chosen months, so a batch of 30 is spread over many dates.
+ */
+function randomLoader(pageSize: number, media?: Media): Loader {
+  let pool: string[] | null = null;
+  const state = new Map<string, { loader: Loader; buf: PhotoAsset[] }>();
   const loader: Loader = {
     done: false,
     async next() {
-      if (!queue) queue = shuffle(await listMonths());
-      while (!current || current.done) {
-        const m = queue.pop();
-        if (!m) {
-          loader.done = true;
-          return [];
+      if (!pool) pool = await listMonths();
+      const out: PhotoAsset[] = [];
+      let guard = 0;
+      while (out.length < 20 && pool.length > 0 && guard++ < 40) {
+        const i = Math.floor(Math.random() * pool.length);
+        const m = pool[i];
+        let st = state.get(m);
+        if (!st) {
+          st = { loader: createLoader(`month:${m}`, pageSize, media), buf: [] };
+          state.set(m, st);
         }
-        current = createLoader(`month:${m}`, pageSize);
+        if (st.buf.length === 0 && !st.loader.done) st.buf = shuffle(await st.loader.next());
+        if (st.buf.length === 0) {
+          pool.splice(i, 1); // month used up (or has no matching media)
+          continue;
+        }
+        out.push(...st.buf.splice(0, 4));
       }
-      return shuffle(await current.next());
+      if (pool.length === 0) loader.done = true;
+      return shuffle(out);
     },
   };
   return loader;

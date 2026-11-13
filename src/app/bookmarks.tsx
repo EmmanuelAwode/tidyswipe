@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text } from 'react-native';
 import { getBookmarkList, toggleBookmark } from '../db/database';
 import { useTheme } from '../theme/theme';
+import { uriForId } from '../services/photos';
 
 export default function Bookmarks() {
   const t = useTheme();
@@ -26,7 +27,7 @@ export default function Bookmarks() {
             { text: 'Remove', onPress: async () => { await toggleBookmark(item); load(); } },
           ])}
         >
-          <Image source={{ uri: `ph://${item}` }} style={styles.thumb} contentFit="cover" recyclingKey={item} />
+          <Image source={{ uri: uriForId(item) }} style={styles.thumb} contentFit="cover" recyclingKey={item} />
         </Pressable>
       )}
     />
