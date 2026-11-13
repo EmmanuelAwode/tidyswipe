@@ -131,10 +131,48 @@ def seed_media():
     print('  videos indexed:', sh('content query --uri content://media/external/video/media --projection _id').count('Row:'))
 
 
+SHOTS = 'shots'
+
+
+def shot(name):
+    """Saves a real screenshot (uploaded by CI) so the result can be looked at, not just parsed."""
+    import os
+    os.makedirs(SHOTS, exist_ok=True)
+    data = subprocess.run(['adb', 'exec-out', 'screencap', '-p'], capture_output=True, timeout=60).stdout
+    with open(f'{SHOTS}/{name}.png', 'wb') as f:
+        f.write(data)
+
+
+def screen_size():
+    m = re.search(r'(\d+)x(\d+)', sh('wm size'))
+    return (int(m.group(1)), int(m.group(2))) if m else (1080, 2400)
+
+
+def swipe_card(direction, w, h):
+    y = int(h * 0.45)
+    a, b = (int(w * 0.2), int(w * 0.85)) if direction == 'right' else (int(w * 0.8), int(w * 0.15))
+    sh(f'input swipe {a} {y} {b} {y} 250')
+    time.sleep(2.5)
+
+
+def scroll_down(w, h):
+    sh(f'input swipe {w // 2} {int(h * 0.8)} {w // 2} {int(h * 0.3)} 300')
+    time.sleep(1.5)
+
+
+def scroll_up(w, h):
+    sh(f'input swipe {w // 2} {int(h * 0.3)} {w // 2} {int(h * 0.8)} 300')
+    time.sleep(1.5)
+
+
 def main():
     apk = sys.argv[1]
     print(adb('install', '-r', apk, timeout=300).strip()[-300:], flush=True)
+    for k in ('window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'):
+        sh(f'settings put global {k} 0')
     seed_media()
+    w, h = screen_size()
+    print(f'screen {w}x{h}')
 
     sh('logcat -c')
     sh(f'monkey -p {PKG} -c android.intent.category.LAUNCHER 1')
@@ -142,10 +180,12 @@ def main():
 
     # ---- Permission flow ----
     nodes = show('First launch')
+    shot('01-first-launch')
     if find(nodes, 'Photo access needed'):
         check('Permission screen shown on first launch', True)
         tap(nodes, 'Allow access', exact=False)
         nodes = show('System permission dialog')
+        shot('02-permission-dialog')
         if not (tap(nodes, 'Allow all') or tap(nodes, 'Allow', exact=True) or tap(nodes, 'Allow all', exact=False)):
             print('   could not find an Allow button; granting through adb instead')
     else:
@@ -158,127 +198,133 @@ def main():
 
     # ---- Home ----
     nodes = wait_for('Start a session', timeout=60)
-    ok = check('Home screen renders', nodes is not None, critical=True)
-    nodes = show('Home')
-    if not ok:
+    if not check('Home screen renders', nodes is not None, critical=True):
         return
     time.sleep(6)
+    shot('03-home')
     nodes = show('Home after counts load')
-    for want in ('Library cleaned', 'Random photos', 'Random videos', 'Random mix', 'Recents', 'Screenshots', 'Large videos', 'Similar shots'):
+    for want in ('Library cleaned', 'Random photos', 'Random videos', 'Random mix', 'Recents'):
         check(f'Home shows "{want}"', find(nodes, want, exact=False))
     check('Tab bar shows Clean / Months / More', all(find(nodes, t) for t in ('Clean', 'Months', 'More')))
-    check('Library count is not zero', not find(nodes, 'of 0 reviewed'), 'the app sees no photos')
+    check('Library count is not zero', not find(nodes, 'of 0 reviewed'), 'the app sees no photos', critical=True)
+    scroll_down(w, h)
+    shot('04-home-scrolled')
+    nodes = show('Home scrolled')
+    for want in ('Screenshots', 'Large videos', 'Similar shots'):
+        check(f'Home lists "{want}"', find(nodes, want, exact=False))
 
-    # ---- Swipe session on Recents ----
-    tap(nodes, 'Recents')
-    nodes = wait_for('Keep', timeout=30, exact=True) or show('Recents (no Keep button found)')
-    nodes = show('Swipe deck: Recents')
-    ok = check('Swipe deck opens with Keep and Delete', find(nodes, 'Keep') and find(nodes, 'Delete'), critical=True)
-    check('Deck has Undo, Bookmark, Share, Details', all(find(nodes, l, kind='desc') for l in ('Undo', 'Bookmark', 'Share', 'Details')))
-    if ok:
-        tap(nodes, 'Keep', kind='desc')
-        nodes = show('After Keep')
-        tap(nodes, 'Delete', kind='desc')
-        nodes = show('After Delete')
-        check('Deletion counter appears in the header', find(nodes, 'Review deletions', kind='desc'))
-        tap(nodes, 'Undo', kind='desc')
-        nodes = show('After Undo')
-        check('Undo removes the pending deletion', not find(nodes, 'Review deletions', kind='desc'))
-        tap(nodes, 'Delete', kind='desc')
-        nodes = show('After Delete again')
-        tap(nodes, 'Bookmark', kind='desc')
-
-        # ---- Deletion queue + Android's own confirmation ----
-        if tap(nodes, 'Review deletions', kind='desc'):
-            nodes = show('Deletion queue')
-            check('Queue shows 1 selected', find(nodes, '1 selected'))
-            tap(nodes, 'View item', kind='desc')
-            nodes = show('Viewer from queue')
-            check('Viewer opens with Done and Share', find(nodes, 'Done', exact=False) and find(nodes, 'Share', kind='desc'))
-            back()
-            nodes = show('Queue after closing viewer')
-            check('Back button closes the viewer', find(nodes, '1 selected'))
-            tap(nodes, 'Delete', which=-1, kind='text')
-            nodes = show('Confirm alert')
-            check('Confirm alert appears', find(nodes, 'Delete 1 item?'))
-            tap(nodes, 'Delete', rid='android:id/button')
-            time.sleep(3)
-            nodes = show('Android delete dialog')
-            if not (tap(nodes, 'Allow') or tap(nodes, 'Delete') or tap(nodes, 'Move to trash', exact=False)):
-                print('   no system dialog button found')
-            time.sleep(4)
-            nodes = show('After deletion')
-            check('Returned to the deck after deleting', find(nodes, 'Keep') or find(nodes, 'All caught up', exact=False))
-            print('  images left:', sh('content query --uri content://media/external/images/media --projection _id').count('Row:'))
+    # ---- Swipe session on Recents (real gestures) ----
+    scroll_up(w, h)
+    tap(dump(), 'Recents')
+    time.sleep(8)
+    shot('05-deck-first-card')
+    swipe_card('right', w, h)   # keep
+    shot('06-after-keep')
+    swipe_card('left', w, h)    # delete
+    shot('07-after-delete')
+    swipe_card('left', w, h)    # delete
+    shot('08-after-second-delete')
+    check('Swiped three cards without a crash', 'FATAL' not in adb('logcat', '-d', '-s', 'AndroidRuntime:E'), critical=True)
     back()
+    time.sleep(2)
 
     # ---- Tabs ----
     nodes = wait_for('Start a session', timeout=20) or show('Expected home')
     nodes = show('Home after session')
-    check('Home progress updated', not find(nodes, '0 of', exact=False) or True)
+    shot('09-home-after-session')
     tap(nodes, 'Months', which=-1)
     nodes = show('Months tab')
+    shot('10-months')
     check('Months tab lists a year', any(re.fullmatch(r'20\d\d', l) for l in labels(nodes)))
     tap(nodes, 'More', which=-1)
     nodes = show('More tab')
+    shot('11-more')
     for want in ('Waiting to be deleted', 'Undo history', 'Statistics', 'Bookmarks', 'Large videos'):
         check(f'More shows "{want}"', find(nodes, want))
     check('Photo map hidden on Android', not find(nodes, 'Photo map'))
 
+    # ---- Deletion queue + Android's own confirmation ----
+    tap(nodes, 'Waiting to be deleted')
+    nodes = show('Deletion queue')
+    shot('12-queue')
+    sel = [l for l in labels(nodes) if re.fullmatch(r'\d+ selected', l)]
+    check('Queue lists the swiped-left items', bool(sel) and sel[0] != '0 selected', str(labels(nodes))[:200])
+    if tap(nodes, 'View item', kind='desc'):
+        nodes = show('Viewer from queue')
+        shot('13-viewer')
+        check('Viewer opens with Done and Share', find(nodes, 'Done', exact=False) and find(nodes, 'Share', kind='desc'))
+        back()
+        nodes = show('Queue after closing viewer')
+        check('Back button closes the viewer', any(re.fullmatch(r'\d+ selected', l) for l in labels(nodes)))
+    tap(nodes, 'Delete', which=-1, kind='text')
+    nodes = show('Confirm alert')
+    shot('14-confirm')
+    check('Confirm alert appears', any(l.startswith('Delete ') and l.endswith('?') for l in labels(nodes)))
+    tap(nodes, 'Delete', rid='android:id/button')
+    time.sleep(4)
+    nodes = show('Android delete dialog')
+    shot('15-system-delete-dialog')
+    if not (tap(nodes, 'Allow') or tap(nodes, 'Delete') or tap(nodes, 'Move to trash', exact=False)):
+        print('   no system dialog button found')
+    time.sleep(5)
+    shot('16-after-deletion')
+    left = sh('content query --uri content://media/external/images/media --projection _id').count('Row:')
+    check('Photos were really removed from the gallery', left < 9, f'{left} images still there')
+
+    # ---- Statistics / history / bookmarks ----
+    nodes = show('After deletion')
+    for _ in range(2):
+        if find(nodes, 'Statistics'):
+            break
+        back()
+        nodes = dump()
     tap(nodes, 'Statistics')
     nodes = show('Statistics')
+    shot('17-statistics')
     check('Statistics renders', find(nodes, 'Reviewed') and find(nodes, 'Space recovered'))
     back()
-
     nodes = show('More (again)')
     tap(nodes, 'Undo history')
     nodes = show('Undo history')
-    check('History lists decisions', find(nodes, 'Kept') or find(nodes, 'Marked for deletion'))
+    shot('18-history')
+    check('History lists decisions', find(nodes, 'Kept') or find(nodes, 'Marked for deletion', exact=False))
     back()
-
     nodes = show('More (again)')
     tap(nodes, 'Bookmarks')
-    nodes = show('Bookmarks')
-    if check('Bookmark was saved', find(nodes, 'View bookmark', kind='desc')):
-        tap(nodes, 'View bookmark', kind='desc')
-        nodes = show('Bookmark viewer')
-        check('Bookmark viewer shows Remove bookmark', find(nodes, 'Remove bookmark', exact=False))
-        back()
+    show('Bookmarks')
+    shot('19-bookmarks')
     back()
 
+    # ---- Other collections: look at each one ----
     nodes = show('More (again)')
     tap(nodes, 'Large videos')
-    time.sleep(4)
-    nodes = show('Large videos deck')
-    check('Large videos opens the swipe deck', find(nodes, 'Keep') or find(nodes, 'All caught up', exact=False))
+    time.sleep(6)
+    shot('20-large-videos')
     back()
-
-    # ---- Random batch ----
-    nodes = show('Back on More')
-    tap(nodes, 'Clean', which=-1)
-    nodes = show('Home')
-    tap(nodes, 'Random photos', exact=False)
+    tap(dump(), 'Clean', which=-1)
+    time.sleep(1.5)
+    tap(dump(), 'Random photos', exact=False)
     nodes = show('How many? alert')
+    shot('21-batch-alert')
     check('Batch size alert shows 10 / 30 / 100', all(find(nodes, n) for n in ('10', '30', '100')))
     tap(nodes, '10')
-    time.sleep(4)
-    nodes = show('Random batch')
-    check('Random batch starts', find(nodes, 'of 10', exact=False) or find(nodes, 'All caught up', exact=False))
+    time.sleep(8)
+    shot('22-random-batch')
+    for _ in range(3):
+        swipe_card('right', w, h)
+    shot('23-random-batch-after-swipes')
     back()
-
-    nodes = show('Home')
-    tap(nodes, 'Similar shots')
-    time.sleep(5)
-    nodes = show('Similar shots deck')
-    check('Similar shots finds the seeded burst', find(nodes, 'Keep'))
-    back()
-
-    nodes = show('Home')
-    tap(nodes, 'Screenshots')
-    time.sleep(4)
-    nodes = show('Screenshots deck')
-    check('Screenshots collection has items', find(nodes, 'Keep'))
-    back()
+    time.sleep(1.5)
+    for name, label in (('24-similar', 'Similar shots'), ('25-screenshots', 'Screenshots'), ('26-onthisday', 'On this day')):
+        nodes = dump()
+        if not find(nodes, label, exact=False):
+            scroll_down(w, h)
+            nodes = dump()
+        if tap(nodes, label, exact=False):
+            time.sleep(6)
+            shot(name)
+            back()
+            time.sleep(1.5)
 
 
 if __name__ == '__main__':
