@@ -200,8 +200,14 @@ def main():
         tap(nodes, 'Allow access', exact=False)
         nodes = show('System permission dialog')
         shot('02-permission-dialog')
-        if not (tap(nodes, 'Allow all') or tap(nodes, 'Allow', exact=True) or tap(nodes, 'Allow all', exact=False)):
-            print('   could not find an Allow button; granting through adb instead')
+        # Android may ask twice: photos and videos, then location info in photos.
+        for attempt in range(3):
+            if not (tap(nodes, 'Allow all') or tap(nodes, 'Allow', exact=True) or tap(nodes, 'Allow all', exact=False)):
+                if attempt == 0:
+                    print('   could not find an Allow button; granting through adb instead')
+                break
+            nodes = show(f'After permission tap {attempt + 1}')
+            shot(f'02-permission-dialog-{attempt + 2}')
     else:
         check('Permission screen shown on first launch', False, 'went straight past it')
     if not wait_for('Start a session', timeout=20):

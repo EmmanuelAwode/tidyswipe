@@ -289,6 +289,15 @@ export async function getInfo(id: string) {
   return ML.getAssetInfoAsync(id, { shouldDownloadFromNetwork: false });
 }
 
+/** false only when the library says the item is gone; a lookup error is treated as "still there". */
+export async function assetExists(id: string): Promise<boolean> {
+  try {
+    return !!(await ML.getAssetInfoAsync(id, { shouldDownloadFromNetwork: false }));
+  } catch {
+    return true;
+  }
+}
+
 export function formatBytes(n: number): string {
   if (n < 1e6) return `${Math.round(n / 1e3)} KB`;
   if (n < 1e9) return `${(n / 1e6).toFixed(n < 1e8 ? 1 : 0)} MB`;

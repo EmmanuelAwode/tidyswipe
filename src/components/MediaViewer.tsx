@@ -118,11 +118,12 @@ function Pager({ ids, start, onClose, actions }: {
 function Page({ id, width, active }: { id: string; width: number; active: boolean }) {
   const [asset, setAsset] = useState<PhotoAsset | null>(null);
   const [missing, setMissing] = useState(false);
+  const [unknown, setUnknown] = useState(false);
   useEffect(() => {
     let live = true;
     getInfo(id)
       .then((a) => { if (live) (a ? setAsset(a) : setMissing(true)); })
-      .catch(() => live && setMissing(true));
+      .catch(() => live && setUnknown(true)); // lookup failed: show it as a photo rather than say it is gone
     return () => { live = false; };
   }, [id]);
 
@@ -131,7 +132,7 @@ function Page({ id, width, active }: { id: string; width: number; active: boolea
       {/* The still shows at once and stays under the video while it loads. */}
       <Image source={{ uri: uriForId(id) }} style={StyleSheet.absoluteFill} contentFit="contain" />
       {missing && <View style={styles.fill}><Text style={{ color: '#fff' }}>This item is no longer in your library.</Text></View>}
-      {!asset && !missing && <View style={styles.fill}><ActivityIndicator color="#fff" /></View>}
+      {!asset && !missing && !unknown && <View style={styles.fill}><ActivityIndicator color="#fff" /></View>}
       {/* Only the page on screen plays, so sound never comes from a neighbour. */}
       {asset?.mediaType === 'video' && active && <Video uri={videoUriOf(asset)} />}
     </View>
