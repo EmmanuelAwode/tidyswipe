@@ -1,66 +1,96 @@
 import { Image } from 'expo-image';
 import { SFSymbol } from 'expo-symbols';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PhotoAsset, getInfo, uriForId, videoUriOf } from '../services/photos';
 import { Icon, Tap } from './ui';
 
-export type ViewerAction = { label: string; icon?: SFSymbol; color?: string; onPress: () => void };
+export type ViewerAction = {
+  label: string;
+  icon?: SFSymbol;
+  color?: string;
+  onPress: () => void | Promise<void>;
+  /** What happens after: 'next' moves on (default), 'removed' means the item leaves the list, 'close' shuts the viewer. */
+  then?: 'next' | 'removed' | 'close';
+};
 
 /**
- * Fullscreen look at one photo or video, opened from any list in the app.
- * `actions` are the decisions available for that item; each one closes the viewer.
+ * Fullscreen viewer opened from any list. Swipe sideways to move through the
+ * whole list, like the Photos app. `actions` are the decisions for the item on screen.
  */
-export function MediaViewer({ id, onClose, actions = [] }: {
-  id: string | null; onClose: () => void; actions?: ViewerAction[];
+export function MediaViewer({ ids, id, onClose, actions }: {
+  ids: string[]; id: string | null; onClose: () => void; actions?: (id: string) => ViewerAction[];
 }) {
   return (
     <Modal visible={!!id} animationType="fade" onRequestClose={onClose}>
-      {id && <Body key={id} id={id} onClose={onClose} actions={actions} />}
+      {id && <Pager ids={ids} start={id} onClose={onClose} actions={actions} />}
     </Modal>
   );
 }
 
-function Body({ id, onClose, actions }: { id: string; onClose: () => void; actions: ViewerAction[] }) {
-  const [asset, setAsset] = useState<PhotoAsset | null>(null);
-  const [missing, setMissing] = useState(false);
-  useEffect(() => {
-    let live = true;
-    getInfo(id)
-      .then((a) => { if (live) (a ? setAsset(a) : setMissing(true)); })
-      .catch(() => live && setMissing(true));
-    return () => { live = false; };
-  }, [id]);
+function Pager({ ids, start, onClose, actions }: {
+  ids: string[]; start: string; onClose: () => void; actions?: (id: string) => ViewerAction[];
+}) {
+  const { width } = useWindowDimensions();
+  const list = useRef<FlatList<string>>(null);
+  const [first] = useState(() => Math.max(0, ids.indexOf(start)));
+  const [index, setIndex] = useState(first);
 
-  const isVideo = asset?.mediaType === 'video';
+  // The list can shrink while open (an item was decided on); stay in range, or close when it empties.
+  useEffect(() => {
+    if (ids.length === 0) onClose();
+    else if (index > ids.length - 1) setIndex(ids.length - 1);
+  }, [ids.length, index, onClose]);
+
+  const current = ids[Math.min(index, ids.length - 1)];
+  if (!current) return <View style={styles.root} />;
+
+  const run = async (a: ViewerAction) => {
+    const mode = a.then ?? 'next';
+    await a.onPress();
+    if (mode === 'close') return onClose();
+    if (mode === 'removed') return; // the next item slides into place
+    if (index < ids.length - 1) {
+      list.current?.scrollToIndex({ index: index + 1, animated: true });
+      setIndex(index + 1);
+    } else onClose();
+  };
+
+  const acts = actions?.(current) ?? [];
   return (
     <View style={styles.root}>
-      {missing ? (
-        <View style={styles.fill}><Text style={{ color: '#fff' }}>This item is no longer in your library.</Text></View>
-      ) : !asset ? (
-        <View style={styles.fill}><ActivityIndicator color="#fff" /></View>
-      ) : isVideo ? (
-        <Video uri={videoUriOf(asset)} />
-      ) : (
-        <Image source={{ uri: uriForId(id) }} style={StyleSheet.absoluteFill} contentFit="contain" />
-      )}
+      <FlatList
+        ref={list}
+        data={ids}
+        keyExtractor={(i) => i}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={first}
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        windowSize={3}
+        initialNumToRender={1}
+        maxToRenderPerBatch={2}
+        onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+        renderItem={({ item }) => <Page id={item} width={width} active={item === current} />}
+      />
 
       <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
         <Tap onPress={onClose} label="Close" style={styles.close}>
           <Icon name="xmark" size={16} color="#fff" />
         </Tap>
+        {ids.length > 1 && (
+          <View style={styles.count}><Text style={styles.countText}>{index + 1} of {ids.length}</Text></View>
+        )}
       </SafeAreaView>
 
-      {actions.length > 0 && !missing && (
-        // Sits above the video's own controls so both stay reachable.
-        <SafeAreaView edges={['bottom']} style={[styles.bottom, isVideo && { bottom: 76 }]} pointerEvents="box-none">
-          {actions.map((a) => (
-            <Tap
-              key={a.label} label={a.label} style={[styles.action, { backgroundColor: a.color ?? 'rgba(40,40,40,0.9)' }]}
-              onPress={() => { onClose(); a.onPress(); }}
-            >
+      {acts.length > 0 && (
+        // Raised so a video's own controls stay reachable underneath.
+        <SafeAreaView edges={['bottom']} style={styles.bottom} pointerEvents="box-none">
+          {acts.map((a) => (
+            <Tap key={a.label} label={a.label} onPress={() => void run(a)} style={[styles.action, { backgroundColor: a.color ?? 'rgba(40,40,40,0.9)' }]}>
               {a.icon && <Icon name={a.icon} size={16} color="#fff" />}
               <Text style={styles.actionText}>{a.label}</Text>
             </Tap>
@@ -71,19 +101,44 @@ function Body({ id, onClose, actions }: { id: string; onClose: () => void; actio
   );
 }
 
+function Page({ id, width, active }: { id: string; width: number; active: boolean }) {
+  const [asset, setAsset] = useState<PhotoAsset | null>(null);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    let live = true;
+    getInfo(id)
+      .then((a) => { if (live) (a ? setAsset(a) : setMissing(true)); })
+      .catch(() => live && setMissing(true));
+    return () => { live = false; };
+  }, [id]);
+
+  return (
+    <View style={{ width, flex: 1 }}>
+      {/* The still shows at once and stays under the video while it loads. */}
+      <Image source={{ uri: uriForId(id) }} style={StyleSheet.absoluteFill} contentFit="contain" />
+      {missing && <View style={styles.fill}><Text style={{ color: '#fff' }}>This item is no longer in your library.</Text></View>}
+      {!asset && !missing && <View style={styles.fill}><ActivityIndicator color="#fff" /></View>}
+      {/* Only the page on screen plays, so sound never comes from a neighbour. */}
+      {asset?.mediaType === 'video' && active && <Video uri={videoUriOf(asset)} />}
+    </View>
+  );
+}
+
 function Video({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.play();
   });
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls />;
+  return <VideoView player={player} style={[StyleSheet.absoluteFill, { bottom: 120 }]} contentFit="contain" nativeControls />;
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  fill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 8, flexDirection: 'row' },
+  fill: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   close: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  count: { height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
+  countText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', justifyContent: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 50, paddingHorizontal: 24, borderRadius: 25 },
   actionText: { color: '#fff', fontWeight: '700', fontSize: 16 },

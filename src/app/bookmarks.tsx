@@ -29,9 +29,13 @@ export default function Bookmarks() {
         )}
       />
       <MediaViewer
+        ids={ids}
         id={open}
         onClose={() => setOpen(null)}
-        actions={open ? [{ label: 'Remove bookmark', icon: 'bookmark.fill', onPress: async () => { await toggleBookmark(open); load(); } }] : []}
+        actions={(id) => [{
+          label: 'Remove bookmark', icon: 'bookmark.fill', then: 'removed',
+          onPress: async () => { await toggleBookmark(id); setIds(await getBookmarkList()); },
+        }]}
       />
     </>
   );

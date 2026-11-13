@@ -66,9 +66,10 @@ export default function Compare() {
         ))}
       </ScrollView>
       <MediaViewer
+        ids={group.ids}
         id={open}
         onClose={() => setOpen(null)}
-        actions={open ? [{ label: 'Keep this one', icon: 'checkmark', color: t.keep, onPress: () => setKeeper(open) }] : []}
+        actions={(id) => [{ label: id === keeper ? 'Keeping this one' : 'Keep this one', icon: 'checkmark', color: t.keep, then: 'close', onPress: () => setKeeper(id) }]}
       />
       <View style={styles.actions}>
         <Pressable onPress={() => finish(true)} style={[styles.btn, { backgroundColor: t.card }]}>

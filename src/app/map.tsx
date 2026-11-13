@@ -89,7 +89,7 @@ export default function PhotoMap() {
               </Pressable>
             )}
           />
-          <MediaViewer id={view} onClose={() => setView(null)} />
+          <MediaViewer ids={open ?? []} id={view} onClose={() => setView(null)} />
         </View>
       </Modal>
     </View>

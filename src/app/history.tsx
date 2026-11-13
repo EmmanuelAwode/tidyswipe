@@ -51,9 +51,10 @@ export default function History() {
       }}
     />
     <MediaViewer
+      ids={[...new Set(rows.filter((r) => r.current !== 'deleted').map((r) => r.asset_id))]}
       id={open}
       onClose={() => setOpen(null)}
-      actions={open ? [{ label: 'Undo decision', icon: 'arrow.uturn.backward', onPress: async () => { await undoDecision(open); load(); } }] : []}
+      actions={(id) => [{ label: 'Undo decision', icon: 'arrow.uturn.backward', then: 'close', onPress: async () => { await undoDecision(id); load(); } }]}
     />
     </>
   );

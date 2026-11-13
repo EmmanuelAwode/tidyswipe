@@ -69,12 +69,13 @@ export default function Review() {
         )}
       />
       <MediaViewer
+        ids={rows.map((r) => r.asset_id)}
         id={open}
         onClose={() => setOpen(null)}
-        actions={open ? [
-          { label: 'Keep it', icon: 'checkmark', color: t.keep, onPress: async () => { await removeFromPending(open); void load(); } },
-          { label: 'Still delete', icon: 'trash.fill', onPress: () => {} },
-        ] : []}
+        actions={(id) => [
+          { label: 'Keep it', icon: 'checkmark', color: t.keep, then: 'removed', onPress: async () => { await removeFromPending(id); await load(); } },
+          { label: 'Still delete', icon: 'trash.fill', color: t.del, onPress: () => {} },
+        ]}
       />
       <View style={styles.actions}>
         <Pressable onPress={() => router.back()} style={[styles.btn, { backgroundColor: t.card }]}>

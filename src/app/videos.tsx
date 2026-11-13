@@ -77,12 +77,17 @@ export default function LargeVideos() {
         }}
       />
       <MediaViewer
+        ids={rows.map((r) => r.asset.id)}
         id={open?.asset.id ?? null}
         onClose={() => setOpen(null)}
-        actions={open ? [
-          { label: 'Keep', icon: 'checkmark', color: t.keep, onPress: () => void keep(open) },
-          ...(queued.has(open.asset.id) ? [] : [{ label: 'Delete', icon: 'trash.fill' as const, color: t.del, onPress: () => void queue(open) }]),
-        ] : []}
+        actions={(id) => {
+          const row = rows.find((r) => r.asset.id === id);
+          if (!row) return [];
+          return [
+            { label: 'Keep', icon: 'checkmark', color: t.keep, then: 'removed', onPress: () => keep(row) },
+            { label: queued.has(id) ? 'Queued' : 'Delete', icon: 'trash.fill', color: t.del, onPress: () => queue(row) },
+          ];
+        }}
       />
       <Pressable onPress={() => router.push('/review')} style={[styles.cta, { backgroundColor: t.accent }]}>
         <Text style={{ color: '#fff', fontWeight: '700' }}>Review deletions</Text>
