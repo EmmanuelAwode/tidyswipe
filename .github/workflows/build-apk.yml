@@ -96,6 +96,15 @@ jobs:
           disable-animations: false
           script: python3 .github/scripts/smoke.py Tidyswipe-test.apk
 
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-screenshots
+          path: shots
+          if-no-files-found: ignore
+          retention-days: 7
+
   release:
     needs: [build, test]
     # Publish whenever the build worked; the notes say whether the emulator test passed.

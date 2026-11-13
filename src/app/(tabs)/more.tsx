@@ -45,7 +45,7 @@ export default function More() {
         </View>
 
         <Text style={{ color: t.sub, fontSize: 12, textAlign: 'center', marginTop: 8 }}>
-          Everything stays on this iPhone. No account, no uploads.
+          Everything stays on this device. No account, no uploads.
         </Text>
       </ScrollView>
     </SafeAreaView>
