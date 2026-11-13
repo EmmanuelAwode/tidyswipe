@@ -3,6 +3,7 @@ import * as ML from 'expo-media-library/legacy';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
+import { MediaViewer } from '../components/MediaViewer';
 import { GeoPoint, getGeotagged } from '../../modules/photo-tools';
 import { useTheme } from '../theme/theme';
 import { uriForId } from '../services/photos';
@@ -46,6 +47,7 @@ export default function PhotoMap() {
   const [points, setPoints] = useState<GeoPoint[] | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [open, setOpen] = useState<string[] | null>(null);
+  const [view, setView] = useState<string | null>(null);
 
   useEffect(() => {
     loadPoints().then((p) => {
@@ -82,11 +84,12 @@ export default function PhotoMap() {
           <FlatList
             data={open ?? []} numColumns={3} keyExtractor={(i) => i}
             renderItem={({ item }) => (
-              <View style={styles.cell}>
+              <Pressable style={styles.cell} onPress={() => setView(item)} accessibilityRole="button" accessibilityLabel="View item">
                 <Image source={{ uri: uriForId(item) }} style={styles.thumb} contentFit="cover" recyclingKey={item} />
-              </View>
+              </Pressable>
             )}
           />
+          <MediaViewer id={view} onClose={() => setView(null)} />
         </View>
       </Modal>
     </View>

@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MediaViewer } from '../components/MediaViewer';
 import { PendingRow, getPending, removeFromPending } from '../db/database';
 import { deletePending } from '../services/deletion';
 import { formatBytes, uriForId } from '../services/photos';
@@ -13,6 +14,7 @@ export default function Review() {
   const t = useTheme();
   const [rows, setRows] = useState<PendingRow[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(async () => setRows(await getPending()), []);
   useEffect(() => { void load(); }, [load]);
@@ -61,16 +63,18 @@ export default function Review() {
         contentContainerStyle={{ padding: 8 }}
         ListEmptyComponent={<Text style={{ color: t.sub, textAlign: 'center', marginTop: 40 }}>Nothing marked for deletion.</Text>}
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.cell}
-            onPress={() => Alert.alert('Remove from deletion queue?', undefined, [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Keep it', onPress: async () => { await removeFromPending(item.asset_id); void load(); } },
-            ])}
-          >
+          <Pressable style={styles.cell} onPress={() => setOpen(item.asset_id)} accessibilityRole="button" accessibilityLabel="View item">
             <Image source={{ uri: uriForId(item.asset_id) }} style={styles.thumb} contentFit="cover" recyclingKey={item.asset_id} />
           </Pressable>
         )}
+      />
+      <MediaViewer
+        id={open}
+        onClose={() => setOpen(null)}
+        actions={open ? [
+          { label: 'Keep it', icon: 'checkmark', color: t.keep, onPress: async () => { await removeFromPending(open); void load(); } },
+          { label: 'Still delete', icon: 'trash.fill', onPress: () => {} },
+        ] : []}
       />
       <View style={styles.actions}>
         <Pressable onPress={() => router.back()} style={[styles.btn, { backgroundColor: t.card }]}>
@@ -83,7 +87,7 @@ export default function Review() {
           <Text style={{ color: '#fff', fontWeight: '700' }}>{busy ? 'Deleting…' : 'Delete'}</Text>
         </Pressable>
       </View>
-      <Text style={[styles.hint, { color: t.sub }]}>Tap a photo to remove it from the queue.</Text>
+      <Text style={[styles.hint, { color: t.sub }]}>Tap an item to view it and decide again.</Text>
     </SafeAreaView>
   );
 }

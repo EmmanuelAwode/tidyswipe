@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFileSizes } from '../../modules/photo-tools';
+import { MediaViewer } from '../components/MediaViewer';
+import { Icon, Tap } from '../components/ui';
 import { setDecision } from '../db/database';
 import { DupGroup, loadAllGroups, resolveGroup } from '../services/duplicates';
 import { formatBytes, uriForId } from '../services/photos';
@@ -15,6 +17,7 @@ export default function Compare() {
   const [group, setGroup] = useState<DupGroup | null>(null);
   const [sizes, setSizes] = useState<Record<string, number>>({});
   const [keeper, setKeeper] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -42,7 +45,7 @@ export default function Compare() {
   const others = group.ids.length - 1;
   return (
     <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
-      <Text style={[styles.hint, { color: t.sub }]}>Tap the photo you want to keep.</Text>
+      <Text style={[styles.hint, { color: t.sub }]}>Tap the photo you want to keep. Use the corner button to see one full size.</Text>
       <ScrollView contentContainerStyle={styles.grid}>
         {group.ids.map((id) => (
           <Pressable key={id} style={styles.cell} onPress={() => setKeeper(id)}>
@@ -51,12 +54,22 @@ export default function Compare() {
               style={[styles.img, { borderColor: id === keeper ? t.keep : 'transparent' }]}
               contentFit="cover"
             />
+            <View style={styles.expand}>
+              <Tap onPress={() => setOpen(id)} label="View full size" style={styles.expandBtn}>
+                <Icon name="arrow.up.left.and.arrow.down.right" size={14} color="#fff" />
+              </Tap>
+            </View>
             <Text style={{ color: t.sub, fontSize: 12, textAlign: 'center' }}>
               {id === keeper ? '✓ Keep · ' : ''}{sizes[id] ? formatBytes(sizes[id]) : ''}
             </Text>
           </Pressable>
         ))}
       </ScrollView>
+      <MediaViewer
+        id={open}
+        onClose={() => setOpen(null)}
+        actions={open ? [{ label: 'Keep this one', icon: 'checkmark', color: t.keep, onPress: () => setKeeper(open) }] : []}
+      />
       <View style={styles.actions}>
         <Pressable onPress={() => finish(true)} style={[styles.btn, { backgroundColor: t.card }]}>
           <Text style={{ color: t.text, fontWeight: '700' }}>Keep all</Text>
@@ -76,6 +89,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 8 },
   cell: { width: '50%', padding: 6, gap: 4 },
   img: { aspectRatio: 3 / 4, borderRadius: 14, borderWidth: 4 },
+  expand: { position: 'absolute', top: 16, right: 16 },
+  expandBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 12, paddingHorizontal: 16 },
   btn: { flex: 1, padding: 16, borderRadius: 16, alignItems: 'center' },
 });
